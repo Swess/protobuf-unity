@@ -3,18 +3,18 @@ using UnityEngine;
 using System.IO;
 using System.Diagnostics;
 
-namespace E7.Protobuf
-{
-    internal class ProtobufUnityCompiler : AssetPostprocessor
-    {
+namespace E7.Protobuf {
+    internal class ProtobufUnityCompiler : AssetPostprocessor {
+
         /// <summary>
         /// Path to the file of all protobuf files in your Unity folder.
         /// </summary>
-        static string[] AllProtoFiles
-        {
-            get
-            {
-                string[] protoFiles = Directory.GetFiles(Application.dataPath+"/../", "*.proto", SearchOption.AllDirectories);
+        static string[] AllProtoFiles {
+            get {
+                string[] protoFiles = Directory.GetFiles(Directory.GetParent(Application.dataPath).ToString(),
+                                                         "*.proto",
+                                                         SearchOption.AllDirectories);
+
                 return protoFiles;
             }
         }
@@ -23,35 +23,31 @@ namespace E7.Protobuf
         /// A parent folder of all protobuf files found in your Unity project collected together.
         /// This means all .proto files in Unity could import each other freely even if they are far apart.
         /// </summary>
-        static string[] IncludePaths
-        {
-            get
-            {
+        static string[] IncludePaths {
+            get {
                 string[] protoFiles = AllProtoFiles;
 
                 string[] includePaths = new string[protoFiles.Length];
-                for (int i = 0; i < protoFiles.Length; i++)
-                {
+                for ( int i = 0; i < protoFiles.Length; i++ ) {
                     string protoFolder = Path.GetDirectoryName(protoFiles[i]);
                     includePaths[i] = protoFolder;
                 }
+
                 return includePaths;
             }
         }
 
         static bool anyChanges = false;
-        static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
-        {
+
+
+        static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths) {
             anyChanges = false;
-            if (ProtoPrefs.enabled == false)
-            {
+            if ( ProtoPrefs.enabled == false ) {
                 return;
             }
 
-            foreach (string str in importedAssets)
-            {
-                if (CompileProtobufAssetPath(str, IncludePaths) == true)
-                {
+            foreach ( string str in importedAssets ) {
+                if ( CompileProtobufAssetPath(str, IncludePaths) == true ) {
                     anyChanges = true;
                 }
             }
@@ -63,96 +59,95 @@ namespace E7.Protobuf
             }
             */
 
-            if (anyChanges)
-            {
+            if ( anyChanges ) {
                 UnityEngine.Debug.Log(nameof(ProtobufUnityCompiler));
                 AssetDatabase.Refresh();
             }
         }
 
+
         /// <summary>
         /// Called from Force Compilation button in the prefs.
         /// </summary>
-        internal static void CompileAllInProject()
-        {
-            if (ProtoPrefs.logStandard)
-            {
+        internal static void CompileAllInProject() {
+            if ( ProtoPrefs.logStandard ) {
                 UnityEngine.Debug.Log("Protobuf Unity : Compiling all .proto files in the project...");
             }
 
-            foreach (string s in AllProtoFiles)
-            {
-                if (ProtoPrefs.logStandard)
-                {
+            foreach ( string s in AllProtoFiles ) {
+                if ( ProtoPrefs.logStandard ) {
                     UnityEngine.Debug.Log("Protobuf Unity : Compiling " + s);
                 }
+
                 CompileProtobufSystemPath(s, IncludePaths);
             }
+
             UnityEngine.Debug.Log(nameof(ProtobufUnityCompiler));
             AssetDatabase.Refresh();
         }
 
-        private static bool CompileProtobufAssetPath(string assetPath, string[] includePaths)
-        {
+
+        private static bool CompileProtobufAssetPath(string assetPath, string[] includePaths) {
             string protoFileSystemPath = Directory.GetParent(Application.dataPath) + Path.DirectorySeparatorChar.ToString() + assetPath;
             return CompileProtobufSystemPath(protoFileSystemPath, includePaths);
         }
 
-        private static bool CompileProtobufSystemPath(string protoFileSystemPath, string[] includePaths)
-        {
-            //Do not compile changes coming from UPM package.
-            if (protoFileSystemPath.Contains("Packages/com.e7.protobuf-unity")) return false;
 
-            if (Path.GetExtension(protoFileSystemPath) == ".proto")
-            {
-                string outputPath = Path.GetDirectoryName(protoFileSystemPath);
+        private static bool CompileProtobufSystemPath(string protoFileSystemPath, string[] includePaths) {
+            // Do not compile changes coming from UPM package.
+            if ( protoFileSystemPath.Contains("Packages/com.e7.protobuf-unity") ) return false;
+
+            // Resolve path, even when pointing in a packages folder
+            string absolutePath = Path.GetFullPath(protoFileSystemPath);
+
+            if ( Path.GetExtension(absolutePath) == ".proto" ) {
+                string outputPath = Path.GetDirectoryName(absolutePath);
 
                 string options = " --csharp_out \"{0}\" ";
-                foreach (string s in includePaths)
-                {
+                foreach ( string s in includePaths ) {
                     options += string.Format(" --proto_path \"{0}\" ", s);
                 }
 
                 // Checking if the user has set valid path (there is probably a better way)
-                if (ProtoPrefs.grpcPath != "ProtobufUnity_GrpcPath" || ProtoPrefs.grpcPath != string.Empty)
+                if ( ProtoPrefs.grpcPath != "ProtobufUnity_GrpcPath" || ProtoPrefs.grpcPath != string.Empty )
                     options += $" --grpc_out={outputPath} --plugin=protoc-gen-grpc={ProtoPrefs.grpcPath}";
                 //string combinedPath = string.Join(" ", optionFiles.Concat(new string[] { protoFileSystemPath }));
 
-                string finalArguments = string.Format("\"{0}\"", protoFileSystemPath) + string.Format(options, outputPath);
+                string finalArguments = string.Format("\"{0}\"", absolutePath) + string.Format(options, outputPath);
 
-                if (ProtoPrefs.logStandard)
-                {
+                if ( ProtoPrefs.logStandard ) {
                     UnityEngine.Debug.Log("Protobuf Unity : Final arguments :\n" + finalArguments);
                 }
 
-                ProcessStartInfo startInfo = new ProcessStartInfo() { FileName = ProtoPrefs.excPath, Arguments = finalArguments };
+                ProcessStartInfo startInfo = new ProcessStartInfo() {FileName = ProtoPrefs.excPath, Arguments = finalArguments};
 
-                Process proc = new Process() { StartInfo = startInfo };
-                proc.StartInfo.UseShellExecute = false;
+                Process proc = new Process() {StartInfo = startInfo};
+                proc.StartInfo.UseShellExecute        = false;
                 proc.StartInfo.RedirectStandardOutput = true;
-                proc.StartInfo.RedirectStandardError = true;
+                proc.StartInfo.RedirectStandardError  = true;
                 proc.Start();
 
                 string output = proc.StandardOutput.ReadToEnd();
-                string error = proc.StandardError.ReadToEnd();
+                string error  = proc.StandardError.ReadToEnd();
                 proc.WaitForExit();
 
-                if (ProtoPrefs.logStandard)
-                {
-                    if (output != "")
-                    {
+                if ( ProtoPrefs.logStandard ) {
+                    if ( output != "" ) {
                         UnityEngine.Debug.Log("Protobuf Unity : " + output);
                     }
-                    UnityEngine.Debug.Log("Protobuf Unity : Compiled " + Path.GetFileName(protoFileSystemPath));
+
+                    UnityEngine.Debug.Log("Protobuf Unity : Compiled " + Path.GetFileName(absolutePath));
                 }
 
-                if (ProtoPrefs.logError && error != "")
-                {
+                if ( ProtoPrefs.logError && error != "" ) {
                     UnityEngine.Debug.LogError("Protobuf Unity : " + error);
                 }
+
                 return true;
             }
+
             return false;
         }
+
     }
 }
