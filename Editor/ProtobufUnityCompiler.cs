@@ -14,7 +14,7 @@ namespace E7.Protobuf
         {
             get
             {
-                string[] protoFiles = Directory.GetFiles(Application.dataPath, "*.proto", SearchOption.AllDirectories);
+                string[] protoFiles = Directory.GetFiles(Application.dataPath+"/../", "*.proto", SearchOption.AllDirectories);
                 return protoFiles;
             }
         }
